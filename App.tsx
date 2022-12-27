@@ -9,12 +9,36 @@ import {
   PanResponderInstance,
   Button,
   BackHandler,
+  StatusBar,
 } from "react-native";
 import { WebView, WebViewMessageEvent } from "react-native-webview";
+import { setBackgroundColorAsync } from "expo-navigation-bar";
 
-// console.log("Hello, world");
+enum WebViewMessageType {
+  GetIsDrawerOpen,
+  SyncTheme,
+}
+
+type MessageData = {
+  type: WebViewMessageType;
+  value: any;
+};
 
 const injectedCss = /* css */ `
+  html {
+    font-size: 1.1rem;
+  }
+
+  #__next > div > div > div:first-of-type {
+    padding-top: calc(${StatusBar.currentHeight}px + 10px);
+  }
+  div[data-headlessui-state="open"] nav {
+    padding-top: calc(${StatusBar.currentHeight}px + 10px);
+  }
+  div[data-headlessui-state="open"] button {
+    margin-top: 27px;
+  }
+
   main > div:last-of-type > div:last-of-type {
     display: none;
   }
@@ -22,7 +46,6 @@ const injectedCss = /* css */ `
   main > div:last-of-type > form {
     margin-bottom: 0.5rem;
   }
-
   main > div:last-of-type textarea {
     font-size: 18px;
   }
@@ -35,6 +58,8 @@ const erudaScript = /* javascript */ `
   script.onload = () => {
     try {
       eruda.init();
+
+      console.log("After eruda");
     } catch (error) {
       console.error(error);
     }
@@ -51,29 +76,75 @@ const cssScript = /* javascript */ `
   document.head.appendChild(style);
 `;
 
+const storageScript = /* javascript */ `
+  var oldStorageSetItem = Storage.prototype.setItem;
+  Storage.prototype.setItem = (key, value) => {
+    if (key === 'theme') {
+      window.ReactNativeWebView.postMessage(
+        JSON.stringify({
+          type: ${WebViewMessageType.SyncTheme},
+          value: value
+        }),
+      );
+    }
+    oldStorageSetItem(key, value);
+  }
+`;
+
 const injectedScript = /* javascript */ `
+  alert('hi')
   try {
     window.addEventListener('load', () => {
       try {
         ${__DEV__ ? erudaScript : ""}
 
-        window.ReactNativeWebView.postMessage('Hello, world');
-
         ${cssScript}
+
+        ${storageScript}
+
+        // Sync theme on init
+        window.ReactNativeWebView.postMessage(
+          JSON.stringify({
+            type: ${WebViewMessageType.SyncTheme},
+            value: localStorage.getItem('theme') || light,
+          }),
+        );
       } catch (error) {
+        alert(error);
         console.error(error);
       }
     });
   } catch (error) {
+        alert(error);
     console.error(error);
   }
 `;
+// try {
+//   window.addEventListener('load', () => {
+//     try {
+//       ${__DEV__ ? erudaScript : ""}
+
+//       ${storageScript}
+
+//       ${cssScript}
+
+//       // Sync theme on init
+//     } catch (error) {
+//       alert(error);
+//       console.error(error);
+//     }
+//   });
+// } catch (error) {
+//       alert(error);
+//   console.error(error);
+// }
+
+const COLOR_LIGHT = "white";
+const COLOR_DARK = "rgb(52, 53, 65)";
 
 const App: React.FC = () => {
   const webviewRef = useRef<null | WebView>(null);
-  const messageHandler = useRef<((event: WebViewMessageEvent) => void) | null>(
-    null
-  );
+  const messageHandler = useRef<((data: MessageData) => void) | null>(null);
 
   const handleOpenDrawler = () => {
     // console.log("open drawer");
@@ -150,18 +221,20 @@ const App: React.FC = () => {
 
   const checkIsOpen = async (): Promise<boolean> => {
     return new Promise((resolve) => {
-      messageHandler.current = (event: WebViewMessageEvent) => {
+      messageHandler.current = (data: MessageData) => {
         // console.log("i got message: ", event.nativeEvent.data);
-        resolve(event.nativeEvent.data === "true");
+        resolve(data.value);
       };
 
       webviewRef.current?.injectJavaScript(/* javascript */ `
         var isDrawerOpen = !!document.querySelector('div[data-headlessui-state="open"]');
         // console.log("DRAWER", isDrawerOpen);
-        window.ReactNativeWebView.postMessage(isDrawerOpen.toString());
+        window.ReactNativeWebView.postMessage(
+          JSON.stringify({ type: ${WebViewMessageType.GetIsDrawerOpen}, value: isDrawerOpen }),
+        );
       `);
 
-      setTimeout(() => resolve(false), 10000);
+      setTimeout(() => resolve(false), 10_000);
     });
   };
 
@@ -218,9 +291,27 @@ const App: React.FC = () => {
     })
   ).current;
 
+  const handleSyncTheme = async (data: MessageData) => {
+    try {
+      await setBackgroundColorAsync(
+        data.value === "light" ? COLOR_LIGHT : COLOR_DARK
+      );
+    } catch (error) {
+      console.error("Handle sync theme error:", error);
+    }
+  };
+
   const handleMessage = (event: WebViewMessageEvent) => {
-    // console.log("MESSAGE: ", event.nativeEvent.data);
-    messageHandler.current?.(event);
+    const data: MessageData = JSON.parse(event.nativeEvent.data);
+
+    if (data.type === WebViewMessageType.SyncTheme) {
+      handleSyncTheme(data);
+      return;
+    }
+
+    if (data.type === WebViewMessageType.GetIsDrawerOpen) {
+      messageHandler.current?.(data);
+    }
   };
 
   return (
@@ -231,13 +322,18 @@ const App: React.FC = () => {
       }}
       {...panResponder.panHandlers}
     >
+      <StatusBar
+        backgroundColor="transparent"
+        barStyle="light-content"
+        translucent={true}
+      />
       <WebView
         ref={webviewRef}
         source={{ uri: "https://chat.openai.com/chat" }}
+        originWhitelist={["*"]}
         cacheEnabled
         cacheMode="LOAD_CACHE_ELSE_NETWORK"
         onMessage={handleMessage}
-        style={{ marginTop: Constants.statusBarHeight }}
         injectedJavaScriptBeforeContentLoaded={injectedScript}
       />
     </View>

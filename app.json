@@ -13,13 +13,13 @@
     "ios": {
       "supportsTablet": true
     },
-    "extra": {
-      "eas": {
-        "projectId": "23469c71-e1f6-4a03-a725-b3b35dff0f23"
-      }
-    },
     "android": {
       "package": "com.egorindev.chatgpt"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "201e3d99-5334-433f-8e72-1d26a6c4bd91"
+      }
     }
   }
 }
