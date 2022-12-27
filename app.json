@@ -1,33 +1,25 @@
 {
   "expo": {
-    "name": "chatgpt-webview-app",
-    "slug": "chatgpt-webview-app",
+    "name": "ChatGPT",
+    "slug": "chatgpt-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
-    },
     "updates": {
       "fallbackToCacheTimeout": 0
     },
-    "assetBundlePatterns": [
-      "**/*"
-    ],
+    "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true
     },
-    "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#FFFFFF"
+    "extra": {
+      "eas": {
+        "projectId": "23469c71-e1f6-4a03-a725-b3b35dff0f23"
       }
     },
-    "web": {
-      "favicon": "./assets/favicon.png"
+    "android": {
+      "package": "com.egorindev.chatgpt"
     }
   }
 }
