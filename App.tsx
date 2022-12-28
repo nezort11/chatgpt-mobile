@@ -10,6 +10,9 @@ import {
   Button,
   BackHandler,
   StatusBar,
+  Keyboard,
+  ScrollView,
+  TextInput,
 } from "react-native";
 import { WebView, WebViewMessageEvent } from "react-native-webview";
 import { setBackgroundColorAsync } from "expo-navigation-bar";
@@ -17,6 +20,7 @@ import { setBackgroundColorAsync } from "expo-navigation-bar";
 enum WebViewMessageType {
   GetIsDrawerOpen,
   SyncTheme,
+  DismissKeyboard,
 }
 
 type MessageData = {
@@ -51,21 +55,6 @@ const injectedCss = /* css */ `
   }
 `;
 
-const erudaScript = /* javascript */ `
-  var script = document.createElement('script');
-  script.src = 'https://cdn.jsdelivr.net/npm/eruda';
-  document.body.appendChild(script);
-  script.onload = () => {
-    try {
-      eruda.init();
-
-      console.log("After eruda");
-    } catch (error) {
-      console.error(error);
-    }
-  }
-`;
-
 const setStyleInnerHtml = /* javascript */ `
   style.innerHTML = \`${injectedCss}\`;
 `;
@@ -76,9 +65,9 @@ const cssScript = /* javascript */ `
   document.head.appendChild(style);
 `;
 
-const storageScript = /* javascript */ `
+const storageChangeHandlerScript = /* javascript */ `
   var oldStorageSetItem = Storage.prototype.setItem;
-  Storage.prototype.setItem = (key, value) => {
+  Storage.prototype.setItem = function(key, value) {
     if (key === 'theme') {
       window.ReactNativeWebView.postMessage(
         JSON.stringify({
@@ -87,64 +76,105 @@ const storageScript = /* javascript */ `
         }),
       );
     }
-    oldStorageSetItem(key, value);
+    oldStorageSetItem.apply(this, arguments);
+  }
+`;
+
+const hrefChangeHandlerScript = /* javascript */ `
+  var oldHref = document.location.href;
+  var body = document.querySelector("body");
+  var observer = new MutationObserver((mutations) => {
+    var currentHref = document.location.href;
+    mutations.forEach(() => {
+      if (oldHref !== currentHref) {
+        var url = new URL(currentHref);
+
+        // If chat page
+        if (url.pathname !== '/chat') {
+          window.ReactNativeWebView.postMessage(
+            JSON.stringify({ type: ${WebViewMessageType.DismissKeyboard} }),
+          );
+        }
+
+        oldHref = currentHref;
+      }
+    });
+  });
+  // Listen to DOM changes
+  observer.observe(body, { childList: true, subtree: true });
+`;
+
+const mainScript = /* javascript */ `
+  ${cssScript}
+
+  ${storageChangeHandlerScript}
+
+  ${hrefChangeHandlerScript}
+
+  // Sync theme on init
+  window.ReactNativeWebView.postMessage(
+    JSON.stringify({
+      type: ${WebViewMessageType.SyncTheme},
+      value: localStorage.getItem('theme') || light,
+    }),
+  );
+`;
+
+// var newChatPlusButton = document.querySelector(
+//   "#__next div div div:first-of-type button:last-of-type"
+// );
+// newChatPlusButton.addEventListener("click", () => {
+//   var textArea = document.querySelector("main textarea");
+//   // textArea.focus();
+//   // textArea.blur();
+//   window.ReactNativeWebView.postMessage(
+//     JSON.stringify({ type: ${WebViewMessageType.DismissKeyboard} }),
+//   );
+// });
+
+const erudaScript = /* javascript */ `
+  var script = document.createElement('script');
+  script.src = 'https://cdn.jsdelivr.net/npm/eruda';
+  document.body.appendChild(script);
+  script.onload = () => {
+    try {
+      eruda.init();
+
+      ${mainScript}
+    } catch (error) {
+      console.error(error);
+    }
   }
 `;
 
 const injectedScript = /* javascript */ `
-  alert('hi')
+  // alert('hi')
   try {
     window.addEventListener('load', () => {
       try {
-        ${__DEV__ ? erudaScript : ""}
-
-        ${cssScript}
-
-        ${storageScript}
-
-        // Sync theme on init
-        window.ReactNativeWebView.postMessage(
-          JSON.stringify({
-            type: ${WebViewMessageType.SyncTheme},
-            value: localStorage.getItem('theme') || light,
-          }),
-        );
+        ${__DEV__ ? erudaScript : mainScript}
       } catch (error) {
-        alert(error);
         console.error(error);
       }
     });
   } catch (error) {
-        alert(error);
     console.error(error);
   }
 `;
-// try {
-//   window.addEventListener('load', () => {
-//     try {
-//       ${__DEV__ ? erudaScript : ""}
-
-//       ${storageScript}
-
-//       ${cssScript}
-
-//       // Sync theme on init
-//     } catch (error) {
-//       alert(error);
-//       console.error(error);
-//     }
-//   });
-// } catch (error) {
-//       alert(error);
-//   console.error(error);
-// }
 
 const COLOR_LIGHT = "white";
 const COLOR_DARK = "rgb(52, 53, 65)";
 
 const App: React.FC = () => {
   const webviewRef = useRef<null | WebView>(null);
+  const textInputRef = useRef<null | TextInput>(null);
   const messageHandler = useRef<((data: MessageData) => void) | null>(null);
+  const [displayTextField, setDisplayTextField] = useState(true);
+
+  const dismissKeyboard = useCallback(() => {
+    textInputRef.current?.focus();
+    textInputRef.current?.blur();
+  }, []);
 
   const handleOpenDrawler = () => {
     // console.log("open drawer");
@@ -187,13 +217,7 @@ const App: React.FC = () => {
     throttle(
       () => {
         // console.log("Throttled left-to-right gesture event");
-        // if (!drawerIsOpen) {
-        // handleOpenChatGptDrawer();
-        // handleOpenDrawler();
         handleOpenDrawler();
-        // webviewRef.current?.injectJavaScript(
-        //   `document.querySelector('button').click();`
-        // );
         // }
       },
       500,
@@ -207,10 +231,7 @@ const App: React.FC = () => {
     throttle(
       () => {
         // console.log("Throttled right-to-left gesture event");
-        // if (!drawerIsOpen) {
-        // handleOpenChatGptDrawer();
         handleCloseDrawler();
-        // }
       },
       500,
       {
@@ -234,7 +255,7 @@ const App: React.FC = () => {
         );
       `);
 
-      setTimeout(() => resolve(false), 10_000);
+      setTimeout(() => resolve(false), 10000);
     });
   };
 
@@ -275,17 +296,13 @@ const App: React.FC = () => {
           // The user made a left-to-right swipe
           // Throttle the callback to be called once every 2 seconds
           // console.log("User made left-to-right gesture");
-          // if (!drawerIsOpen.current) {
           handleLeftToRightSwipe();
-          // }
         }
         if (gestureState.dx < 0) {
           // The user made a left-to-right swipe
           // Throttle the callback to be called once every 2 seconds
           // console.log("User made -to-right gesture");
-          // if (!drawerIsOpen.current) {
           handleRightToLeftSwipe();
-          // }
         }
       },
     })
@@ -297,7 +314,7 @@ const App: React.FC = () => {
         data.value === "light" ? COLOR_LIGHT : COLOR_DARK
       );
     } catch (error) {
-      console.error("Handle sync theme error:", error);
+      console.error(error);
     }
   };
 
@@ -309,10 +326,19 @@ const App: React.FC = () => {
       return;
     }
 
+    if (data.type === WebViewMessageType.DismissKeyboard) {
+      dismissKeyboard();
+      return;
+    }
+
     if (data.type === WebViewMessageType.GetIsDrawerOpen) {
       messageHandler.current?.(data);
     }
   };
+
+  const handleWebViewLoaded = useCallback(() => {
+    webviewRef.current?.requestFocus();
+  }, []);
 
   return (
     <View
@@ -331,11 +357,19 @@ const App: React.FC = () => {
         ref={webviewRef}
         source={{ uri: "https://chat.openai.com/chat" }}
         originWhitelist={["*"]}
+        domStorageEnabled
         cacheEnabled
         cacheMode="LOAD_CACHE_ELSE_NETWORK"
         onMessage={handleMessage}
         injectedJavaScriptBeforeContentLoaded={injectedScript}
+        keyboardDisplayRequiresUserAction={false}
+        onLoad={handleWebViewLoaded}
+        // bounces={false}
+        overScrollMode="never"
+        // allowFileAccess
+        // allowFileAccessFromFileURLs
       />
+      <TextInput ref={textInputRef} autoFocus style={{ display: "none" }} />
     </View>
   );
 };
