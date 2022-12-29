@@ -22,6 +22,8 @@ enum WebViewMessageType {
   GetIsDrawerOpen,
   SyncTheme,
   DismissKeyboard,
+  ScrollStarted,
+  ScrollEnded,
 }
 
 type MessageData = {
@@ -46,7 +48,7 @@ const useUpdateEffect = (
 
 const injectedCss = /* css */ `
   html {
-    font-size: 1.1rem;
+    font-size: 1.2rem;
   }
 
   /* Add padding/margin for transparent status bar */
@@ -60,7 +62,10 @@ const injectedCss = /* css */ `
     margin-top: 27px;
   }
 
-  /* Hide switch theme and discord button */
+  /* Hide new chat, switch theme and discord button */
+  div[data-headlessui-state="open"] nav > a:nth-of-type(1) {
+    display: none;
+  }
   div[data-headlessui-state="open"] nav > a:nth-of-type(3) {
     display: none;
   }
@@ -71,8 +76,30 @@ const injectedCss = /* css */ `
   main > div:last-of-type > form {
     margin-bottom: 0.5rem;
   }
-  main > div:last-of-type textarea {
-    font-size: 18px;
+
+  /* Hide welcome text */
+  main > div:nth-of-type(1) > div > div > div > div:nth-of-type(1) > div.items-start.text-center {
+    display: none;
+  }
+  /* Align ChatGPT vertically */
+  main > div:nth-of-type(1) > div > div > div {
+    justify-content: center;
+  }
+
+  /* Fix answer content */
+  main > div:nth-of-type(1) > div > div > div:nth-of-type(2n+2) > div > div:nth-of-type(2) > div:nth-of-type(1) {
+    max-width: 100%;
+  }
+
+  /* Fix question content */
+  main > div:nth-of-type(1) > div > div > div:nth-of-type(2n+1) > div > div:nth-of-type(2) > div:nth-of-type(1) {
+    max-width: 100%;
+    word-wrap: anywhere;
+  }
+
+  /* Hide like / dislike answer buttons */
+  main > div:nth-of-type(1) > div > div > div:nth-of-type(2n+2) > div > div:nth-of-type(2) > div:nth-of-type(2) {
+    display: none;
   }
 
   /* Hide footer caption */
@@ -130,8 +157,33 @@ const hrefChangeHandlerScript = /* javascript */ `
   observer.observe(body, { childList: true, subtree: true });
 `;
 
+const scrollScript = /* javascript */ `
+  var scrollEndTimeoutId;
+  window.addEventListener('scroll', (event) => {
+    if (event.target.scrollLeft > 0) {
+      if (scrollEndTimeoutId) {
+        clearTimeout(scrollEndTimeoutId);
+      } else {
+        console.log('Scroll started');
+        window.ReactNativeWebView.postMessage(
+          JSON.stringify({ type: ${WebViewMessageType.ScrollStarted} }),
+        );
+      }
+      scrollEndTimeoutId = setTimeout(() => {
+        console.log('Scroll ended');
+        window.ReactNativeWebView.postMessage(
+          JSON.stringify({ type: ${WebViewMessageType.ScrollEnded} }),
+        );
+        scrollEndTimeoutId = 0;
+      }, 1000);
+    }
+  }, 1);
+`;
+
 const mainScript = /* javascript */ `
   ${cssScript}
+
+  ${scrollScript}
 
   ${hrefChangeHandlerScript}
 
@@ -196,6 +248,7 @@ const App: React.FC = () => {
   const textInputRef = useRef<null | TextInput>(null);
   const messageHandler = useRef<((data: MessageData) => void) | null>(null);
   const wasLoaded = useRef(false);
+  const isWebappScrollingX = useRef(false);
 
   const dismissKeyboard = useCallback(() => {
     textInputRef.current?.focus();
@@ -269,30 +322,11 @@ const App: React.FC = () => {
   `);
   }, []);
 
-  const handleLeftToRightSwipe = useRef(
+  const handleHorizontalSwipe = useRef(
     throttle(
-      () => {
-        // console.log("Throttled left-to-right gesture event");
-        handleOpenDrawler();
-        // }
-      },
+      (dx: number) => (dx > 0 ? handleOpenDrawler() : handleCloseDrawler()),
       500,
-      {
-        trailing: false,
-      }
-    )
-  ).current;
-
-  const handleRightToLeftSwipe = useRef(
-    throttle(
-      () => {
-        // console.log("Throttled right-to-left gesture event");
-        handleCloseDrawler();
-      },
-      500,
-      {
-        trailing: false,
-      }
+      { trailing: false }
     )
   ).current;
 
@@ -328,9 +362,7 @@ const App: React.FC = () => {
   };
 
   const handleBackButton = () => {
-    // console.log("handleBackButton");
     handleBackButtonAsync();
-    // console.log("something have happended");
     return true;
   };
 
@@ -344,22 +376,9 @@ const App: React.FC = () => {
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_event, gestureState) =>
-        Math.abs(gestureState.dx) > 50,
+        !isWebappScrollingX.current && Math.abs(gestureState.dx) > 70,
       onPanResponderMove: (_event, gestureState) => {
-        // console.log("onPanResponderMove was called");
-        // console.log("on pan responder move");
-        if (gestureState.dx > 0) {
-          // The user made a left-to-right swipe
-          // Throttle the callback to be called once every 2 seconds
-          // console.log("User made left-to-right gesture");
-          handleLeftToRightSwipe();
-        }
-        if (gestureState.dx < 0) {
-          // The user made a left-to-right swipe
-          // Throttle the callback to be called once every 2 seconds
-          // console.log("User made -to-right gesture");
-          handleRightToLeftSwipe();
-        }
+        handleHorizontalSwipe(gestureState.dx);
       },
     })
   ).current;
@@ -388,6 +407,16 @@ const App: React.FC = () => {
 
     if (data.type === WebViewMessageType.DismissKeyboard) {
       dismissKeyboard();
+      return;
+    }
+
+    if (data.type === WebViewMessageType.ScrollStarted) {
+      isWebappScrollingX.current = true;
+      return;
+    }
+
+    if (data.type === WebViewMessageType.ScrollEnded) {
+      isWebappScrollingX.current = false;
       return;
     }
 
@@ -431,7 +460,7 @@ const App: React.FC = () => {
         originWhitelist={["*"]}
         domStorageEnabled
         cacheEnabled
-        cacheMode="LOAD_CACHE_ELSE_NETWORK"
+        cacheMode="LOAD_DEFAULT"
         onMessage={handleMessage}
         injectedJavaScriptBeforeContentLoaded={injectedScript}
         keyboardDisplayRequiresUserAction={false}
@@ -439,6 +468,7 @@ const App: React.FC = () => {
         bounces
         pullToRefreshEnabled
         overScrollMode="never"
+        onScroll={() => console.log("SCROLLING")}
         // allowFileAccess
         // allowFileAccessFromFileURLs
       />
