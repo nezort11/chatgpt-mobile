@@ -13,6 +13,7 @@ import {
   Keyboard,
   ScrollView,
   TextInput,
+  useColorScheme,
 } from "react-native";
 import { WebView, WebViewMessageEvent } from "react-native-webview";
 import { setBackgroundColorAsync } from "expo-navigation-bar";
@@ -28,11 +29,27 @@ type MessageData = {
   value: any;
 };
 
+const useUpdateEffect = (
+  effect: React.EffectCallback,
+  deps: React.DependencyList
+) => {
+  const isInitialMount = useRef(true);
+
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+    } else {
+      return effect();
+    }
+  }, deps);
+};
+
 const injectedCss = /* css */ `
   html {
     font-size: 1.1rem;
   }
 
+  /* Add padding/margin for transparent status bar */
   #__next > div > div > div:first-of-type {
     padding-top: calc(${StatusBar.currentHeight}px + 10px);
   }
@@ -43,7 +60,11 @@ const injectedCss = /* css */ `
     margin-top: 27px;
   }
 
-  main > div:last-of-type > div:last-of-type {
+  /* Hide switch theme and discord button */
+  div[data-headlessui-state="open"] nav > a:nth-of-type(3) {
+    display: none;
+  }
+  div[data-headlessui-state=open] nav > a:nth-of-type(4) {
     display: none;
   }
 
@@ -52,6 +73,11 @@ const injectedCss = /* css */ `
   }
   main > div:last-of-type textarea {
     font-size: 18px;
+  }
+
+  /* Hide footer caption */
+  main > div:last-of-type > div:last-of-type {
+    display: none;
   }
 `;
 
@@ -106,8 +132,6 @@ const hrefChangeHandlerScript = /* javascript */ `
 
 const mainScript = /* javascript */ `
   ${cssScript}
-
-  ${storageChangeHandlerScript}
 
   ${hrefChangeHandlerScript}
 
@@ -166,15 +190,47 @@ const COLOR_LIGHT = "white";
 const COLOR_DARK = "rgb(52, 53, 65)";
 
 const App: React.FC = () => {
+  const systemTheme = useColorScheme(); // dark mode
+
   const webviewRef = useRef<null | WebView>(null);
   const textInputRef = useRef<null | TextInput>(null);
   const messageHandler = useRef<((data: MessageData) => void) | null>(null);
-  const [displayTextField, setDisplayTextField] = useState(true);
+  const wasLoaded = useRef(false);
 
   const dismissKeyboard = useCallback(() => {
     textInputRef.current?.focus();
     textInputRef.current?.blur();
   }, []);
+
+  const switchTheme = () => {
+    webviewRef.current?.injectJavaScript(/* javascript */ `
+      try {
+        var drawerOpenObserver;
+        drawerOpenObserver = new MutationObserver(() => {
+          const switchThemeButton = document.querySelector('div[data-headlessui-state="open"] nav > a:nth-of-type(3)');
+          // console.log("theme button:", switchThemeButton)
+          if (switchThemeButton) {
+            switchThemeButton.click();
+            drawerOpenObserver.disconnect();
+            // Close a drawer after call-stack is executed (async)
+            setTimeout(() => {
+              // Directly remove drawer from the DOM (workaround when closing using button is buggy)
+              document.querySelector('#headlessui-portal-root').remove();
+              // console.log("CLOSED")
+            });
+          }
+        });
+
+        var body = document.querySelector('body');
+        drawerOpenObserver.observe(body, { childList: true});
+        var switchDrawerButton = document.querySelector('button');
+        switchDrawerButton.click();
+      } catch (error) {
+        console.error(error);
+      }
+    `);
+    webviewRef.current?.requestFocus();
+  };
 
   const handleOpenDrawler = () => {
     // console.log("open drawer");
@@ -310,9 +366,13 @@ const App: React.FC = () => {
 
   const handleSyncTheme = async (data: MessageData) => {
     try {
-      await setBackgroundColorAsync(
-        data.value === "light" ? COLOR_LIGHT : COLOR_DARK
-      );
+      // Sync system and webapp themes
+      // console.log("System theme:", systemTheme);
+      // console.log("Webapp theme:", data.value);
+      if (systemTheme !== data.value) {
+        // console.log("Switching theme");
+        setTimeout(() => switchTheme(), 1000);
+      }
     } catch (error) {
       console.error(error);
     }
@@ -336,9 +396,21 @@ const App: React.FC = () => {
     }
   };
 
-  const handleWebViewLoaded = useCallback(() => {
-    webviewRef.current?.requestFocus();
+  const handleWebViewLoaded = useCallback(async () => {
+    if (!wasLoaded.current) {
+      webviewRef.current?.requestFocus();
+
+      await setBackgroundColorAsync(
+        systemTheme === "light" ? COLOR_LIGHT : COLOR_DARK
+      );
+      wasLoaded.current = true;
+    }
   }, []);
+
+  useUpdateEffect(() => {
+    switchTheme();
+    setBackgroundColorAsync(systemTheme === "light" ? COLOR_LIGHT : COLOR_DARK);
+  }, [systemTheme]);
 
   return (
     <View
@@ -364,7 +436,8 @@ const App: React.FC = () => {
         injectedJavaScriptBeforeContentLoaded={injectedScript}
         keyboardDisplayRequiresUserAction={false}
         onLoad={handleWebViewLoaded}
-        // bounces={false}
+        bounces
+        pullToRefreshEnabled
         overScrollMode="never"
         // allowFileAccess
         // allowFileAccessFromFileURLs
