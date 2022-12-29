@@ -180,12 +180,20 @@ const scrollScript = /* javascript */ `
   }, 1);
 `;
 
+const cloudflareRefreshScript = /* javascript */ `
+  setInterval(() => {
+      location.reload();
+  }, 3600000); // 1 hours (though it expires after 2 hours from issuing time)
+`;
+
 const mainScript = /* javascript */ `
   ${cssScript}
 
+  ${hrefChangeHandlerScript}
+
   ${scrollScript}
 
-  ${hrefChangeHandlerScript}
+  ${cloudflareRefreshScript}
 
   // Sync theme on init
   window.ReactNativeWebView.postMessage(
