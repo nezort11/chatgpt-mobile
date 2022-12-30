@@ -58,18 +58,21 @@ const injectedCss = /* css */ `
   div[data-headlessui-state="open"] nav {
     padding-top: calc(${StatusBar.currentHeight}px + 10px);
   }
-  div[data-headlessui-state="open"] button {
-    margin-top: 27px;
-  }
 
-  /* Hide new chat, switch theme and discord button */
+  /* Hide new chat, switch theme, discord button, clear conversations, close button */
   div[data-headlessui-state="open"] nav > a:nth-of-type(1) {
+    display: none;
+  }
+  div[data-headlessui-state=open] nav > a:nth-of-type(2) {
     display: none;
   }
   div[data-headlessui-state="open"] nav > a:nth-of-type(3) {
     display: none;
   }
   div[data-headlessui-state=open] nav > a:nth-of-type(4) {
+    display: none;
+  }
+  #headlessui-portal-root button[type=button] {
     display: none;
   }
 
@@ -82,13 +85,9 @@ const injectedCss = /* css */ `
     display: none;
   }
   /* Align ChatGPT vertically */
-  main > div:nth-of-type(1) > div > div > div {
-    justify-content: center;
-  }
-
-  /* Fix answer content */
-  main > div:nth-of-type(1) > div > div > div:nth-of-type(2n+2) > div > div:nth-of-type(2) > div:nth-of-type(1) {
-    max-width: 100%;
+  main > div:nth-of-type(1) > div > div > div > div:nth-of-type(1).px-6 {
+    margin-top: auto;
+    margin-bottom: auto;
   }
 
   /* Fix question content */
@@ -96,9 +95,27 @@ const injectedCss = /* css */ `
     max-width: 100%;
     word-wrap: anywhere;
   }
+  /* /chat page */
+  main > div:nth-of-type(1) > div > div > div > div:nth-of-type(2n+1) > div > div:nth-of-type(2) > div:nth-of-type(1) {
+    max-width: 100%;
+    word-wrap: anywhere;
+  }
 
-  /* Hide like / dislike answer buttons */
+  /* Fix answer content */
+  /* /chat/... page */
+  main > div:nth-of-type(1) > div > div > div:nth-of-type(2n+2) > div > div:nth-of-type(2) > div:nth-of-type(1) {
+    max-width: 100%;
+  }
+  /* /chat page */
+  main > div:nth-of-type(1) > div > div > div > div:nth-of-type(2n+2) > div > div:nth-of-type(2) > div:nth-of-type(1) {
+    max-width: 100%;
+  }
+
+  /* Hide answer like / dislike buttons */
   main > div:nth-of-type(1) > div > div > div:nth-of-type(2n+2) > div > div:nth-of-type(2) > div:nth-of-type(2) {
+    display: none;
+  }
+  main > div:nth-of-type(1) > div > div > div > div:nth-of-type(2n+2) > div > div:nth-of-type(2) > div:nth-of-type(2) {
     display: none;
   }
 
@@ -384,7 +401,13 @@ const App: React.FC = () => {
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_event, gestureState) =>
-        !isWebappScrollingX.current && Math.abs(gestureState.dx) > 70,
+        !isWebappScrollingX.current &&
+        Math.abs(gestureState.dx) > Math.abs(gestureState.dy) &&
+        // Swipe delta
+        Math.sqrt(
+          Math.pow(Math.abs(gestureState.dx), 2) +
+            Math.pow(Math.abs(gestureState.dy), 2)
+        ) > 70,
       onPanResponderMove: (_event, gestureState) => {
         handleHorizontalSwipe(gestureState.dx);
       },
