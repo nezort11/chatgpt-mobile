@@ -13,6 +13,7 @@
     "expo": "~47.0.9",
     "expo-constants": "^14.0.2",
     "expo-navigation-bar": "~2.0.1",
+    "expo-splash-screen": "~0.17.5",
     "expo-status-bar": "~1.4.2",
     "expo-system-ui": "~2.0.1",
     "lodash": "^4.17.21",

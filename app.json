@@ -5,6 +5,16 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "backgroundColor": "#FFFFFF",
+      "resizeMode": "contain",
+      "dark": {
+        "image": "./assets/splash_dark.png",
+        "backgroundColor": "#343541",
+        "resizeMode": "contain"
+      }
+    },
     "userInterfaceStyle": "automatic",
     "updates": {
       "fallbackToCacheTimeout": 0

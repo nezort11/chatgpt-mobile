@@ -181,13 +181,13 @@ const scrollScript = /* javascript */ `
       if (scrollEndTimeoutId) {
         clearTimeout(scrollEndTimeoutId);
       } else {
-        console.log('Scroll started');
+        // console.log('Scroll started');
         window.ReactNativeWebView.postMessage(
           JSON.stringify({ type: ${WebViewMessageType.ScrollStarted} }),
         );
       }
       scrollEndTimeoutId = setTimeout(() => {
-        console.log('Scroll ended');
+        // console.log('Scroll ended');
         window.ReactNativeWebView.postMessage(
           JSON.stringify({ type: ${WebViewMessageType.ScrollEnded} }),
         );
@@ -263,8 +263,8 @@ const injectedScript = /* javascript */ `
   }
 `;
 
-const COLOR_LIGHT = "white";
-const COLOR_DARK = "rgb(52, 53, 65)";
+const COLOR_LIGHT = "#FFFFFF";
+const COLOR_DARK = "#343541";
 
 const App: React.FC = () => {
   const systemTheme = useColorScheme(); // dark mode
