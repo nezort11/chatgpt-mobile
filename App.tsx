@@ -490,8 +490,9 @@ const App: React.FC = () => {
         source={{ uri: "https://chat.openai.com/chat" }}
         originWhitelist={["*"]}
         domStorageEnabled
-        cacheEnabled
-        cacheMode="LOAD_DEFAULT"
+        cacheEnabled={false}
+        // cacheMode="LOAD_DEFAULT"
+        cacheMode="LOAD_NO_CACHE"
         onMessage={handleMessage}
         injectedJavaScriptBeforeContentLoaded={injectedScript}
         keyboardDisplayRequiresUserAction={false}
