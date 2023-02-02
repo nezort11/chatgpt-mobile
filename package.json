@@ -13,7 +13,7 @@
     "web": "expo start --web",
     "build": "eas build --platform=android --profile=production --non-interactive | tee $(mkdir -p ./dist && echo ./dist/build-output.txt)",
     "download": "if [ -f ./dist/build-output.txt ]; then curl -LJ -o ./dist/chatgpt.apk $(echo $(grep 'https://expo.dev/artifacts/eas/[a-zA-Z0-9]*\\.[a-zA-Z]*' ./dist/build-output.txt)) ; else echo 'Please run `yarn build` first' ; fi",
-    "publish": "if [ -f ./dist/chatgpt.apk ]; then   gh-release create ./dist/chatgpt.apk   ; else echo 'Please run `yarn download` first' ; fi"
+    "publish": "if [ -f ./dist/chatgpt.apk ]; then   gh-release create --assets ./dist/chatgpt.apk   ; else echo 'Please run `yarn download` first' ; fi"
   },
   "dependencies": {
     "@types/lodash": "^4.14.191",
