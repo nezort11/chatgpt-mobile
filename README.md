@@ -8,12 +8,14 @@ Download Android APK file on
 
 **Features**:
 
-- drawer swipe
+- improved mobile UI/UX
+- native drawer swipe
 - transparent status bar
 - themed bottom bar
-- back button close drawer
+- android back button integration (close drawer / quite)
 - startup keyboard auto open
 - chat keyboard auto dismiss
+- splash screen
 
 <div align="center">
 
