@@ -3,8 +3,7 @@
 ChatGPT 🤖 mobile application bulit using React Native, Expo &amp; Webview
 
 Download Android APK file on
-[Github Releases](https://github.com/nezort11/chatgpt-mobile/releases/) or
-[APKPure](https://apkpure.com/p/com.egorindev.chatgpt).
+[Github Releases](https://github.com/nezort11/chatgpt-mobile/releases/).
 
 **Features**:
 
