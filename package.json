@@ -1,12 +1,19 @@
 {
   "name": "chatgpt-mobile",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "main": "node_modules/expo/AppEntry.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nezort11/chatgpt-mobile.git"
+  },
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "build": "eas build --platform=android --profile=production --non-interactive | tee $(mkdir -p ./dist && echo ./dist/build-output.txt)",
+    "download": "if [ -f ./dist/build-output.txt ]; then curl -LJ -o ./dist/chatgpt.apk $(echo $(grep 'https://expo.dev/artifacts/eas/[a-zA-Z0-9]*\\.[a-zA-Z]*' ./dist/build-output.txt)) ; else echo 'Please run `yarn build` first' ; fi",
+    "publish": "if [ -f ./dist/chatgpt.apk ]; then   gh-release create ./dist/chatgpt.apk   ; else echo 'Please run `yarn download` first' ; fi"
   },
   "dependencies": {
     "@types/lodash": "^4.14.191",
@@ -27,6 +34,7 @@
     "@babel/core": "^7.12.9",
     "@types/react": "~18.0.14",
     "@types/react-native": "~0.70.6",
+    "gh-release": "^7.0.2",
     "typescript": "^4.6.3"
   },
   "private": true
