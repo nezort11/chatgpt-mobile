@@ -3,7 +3,7 @@
 ChatGPT 🤖 mobile application bulit using React Native, Expo &amp; Webview
 
 Download Android APK file on
-[Github Releases](https://github.com/nezort11/chatgpt-mobile/releases/).
+[GitHub Releases](https://github.com/nezort11/chatgpt-mobile/releases/).
 
 **Features**:
 
@@ -11,10 +11,12 @@ Download Android APK file on
 - native drawer swipe
 - transparent status bar
 - themed bottom bar
-- android back button integration (close drawer / quite)
+- android back button (close drawer / quit app)
 - startup keyboard auto open
 - chat keyboard auto dismiss
 - splash screen
+- page reload button
+- "chatgpt is at capacity" workaround
 
 <div align="center">
 

@@ -1,17 +1,10 @@
-import Constants from "expo-constants";
-import { throttle, noop } from "lodash";
-import React, { useRef, useEffect, useCallback, useState } from "react";
+import { throttle } from "lodash";
+import React, { useRef, useEffect, useCallback } from "react";
 import {
   View,
-  Text,
-  StyleSheet,
   PanResponder,
-  PanResponderInstance,
-  Button,
   BackHandler,
   StatusBar,
-  Keyboard,
-  ScrollView,
   TextInput,
   useColorScheme,
 } from "react-native";
@@ -24,6 +17,7 @@ enum WebViewMessageType {
   DismissKeyboard,
   ScrollStarted,
   ScrollEnded,
+  ReloadPage,
 }
 
 type MessageData = {
@@ -46,30 +40,61 @@ const useUpdateEffect = (
   }, deps);
 };
 
+const refreshIcon = /* html */ `
+  <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" width="25" viewBox="0 0 48 48">
+    <path d="M24 40q-6.65 0-11.325-4.675Q8 30.65 8 24q0-6.65 4.675-11.325Q17.35 8 24 8q4.25 0 7.45 1.725T37 14.45V9.5q0-.65.425-1.075Q37.85 8 38.5 8q.65 0 1.075.425Q40 8.85 40 9.5v9.7q0 .65-.425 1.075-.425.425-1.075.425h-9.7q-.65 0-1.075-.425-.425-.425-.425-1.075 0-.65.425-1.075.425-.425 1.075-.425h6.9q-1.9-3-4.85-4.85Q27.9 11 24 11q-5.45 0-9.225 3.775Q11 18.55 11 24q0 5.45 3.775 9.225Q18.55 37 24 37q3.9 0 7.15-2.075Q34.4 32.85 36 29.35q.2-.4.65-.7.45-.3.9-.3.85 0 1.225.55.375.55.075 1.3-1.85 4.45-5.875 7.125T24 40Z"/>
+  </svg>
+`;
+
+const headerSelector = "#__next > div:nth-of-type(1) > div > div";
+const mainSelector = "#__next > div:nth-of-type(1) > div > main";
+const conversationSelector = `${mainSelector} > div:nth-of-type(1) > div:nth-of-type(1) > div`;
+
+const burgerButtonSelector = `${headerSelector} > button:nth-of-type(1)`;
+
+const plusButtonSelector = `${headerSelector} > button:last-of-type`;
+
+const drawerRoot = 'div[data-headlessui-state="open"]';
+const drawerContentSelector = `${drawerRoot} nav`;
+
 const injectedCss = /* css */ `
   html {
     font-size: 1.2rem;
   }
 
+  ${headerSelector} button {
+    box-shadow: none !important;
+    color: currentColor !important;
+    border: none !important;
+    outline: none !important;
+  }
+
+  ${drawerContentSelector} button {
+    box-shadow: none !important;
+    color: currentColor !important;
+    border: none !important;
+    outline: none !important;
+  }
+
   /* Add padding/margin for transparent status bar */
-  #__next > div > div > div:first-of-type {
+  ${headerSelector} {
     padding-top: calc(${StatusBar.currentHeight}px + 10px);
   }
-  div[data-headlessui-state="open"] nav {
+  ${drawerContentSelector} {
     padding-top: calc(${StatusBar.currentHeight}px + 10px);
   }
 
-  /* Hide new chat, switch theme, discord button, clear conversations, close button */
-  div[data-headlessui-state="open"] nav > a:nth-of-type(1) {
+  /* Hide new chat, dark node, discord, clear conversation, close button */
+  ${drawerContentSelector} > a:nth-of-type(1) {
     display: none;
   }
-  div[data-headlessui-state=open] nav > a:nth-of-type(2) {
+  ${drawerContentSelector} > a:nth-of-type(2) {
     display: none;
   }
-  div[data-headlessui-state="open"] nav > a:nth-of-type(3) {
+  ${drawerContentSelector} > a:nth-of-type(3) {
     display: none;
   }
-  div[data-headlessui-state=open] nav > a:nth-of-type(4) {
+  ${drawerContentSelector} > a:nth-of-type(4) {
     display: none;
   }
   #headlessui-portal-root button[type=button] {
@@ -80,11 +105,11 @@ const injectedCss = /* css */ `
     margin-bottom: 0.5rem;
   }
 
-  /* Hide welcome text */
+  /* Hide examples, capabilities, limitations */
   main > div:nth-of-type(1) > div > div > div > div:nth-of-type(1) > div.items-start.text-center {
     display: none;
   }
-  /* Align ChatGPT vertically */
+  /* Align "ChatGPT" vertically */
   main > div:nth-of-type(1) > div > div > div > div:nth-of-type(1).px-6 {
     margin-top: auto;
     margin-bottom: auto;
@@ -129,10 +154,43 @@ const setStyleInnerHtml = /* javascript */ `
   style.innerHTML = \`${injectedCss}\`;
 `;
 
+const insertRefreshButtonScript = /* javascript */ `
+  var oldRefreshButton = document.querySelector("#refresh");
+  console.log('oldRefreshButton', oldRefreshButton);
+
+  if (!oldRefreshButton) {
+    var header = document.querySelector("${headerSelector}");
+    var plusButton = document.querySelector("${plusButtonSelector}");
+    var refreshButton = document.createElement("button");
+    refreshButton.id = "refresh";
+    refreshButton.className = "px-3";
+    refreshButton.innerHTML = \`${refreshIcon}\`;
+    refreshButton.addEventListener("click", () => {
+      window.ReactNativeWebView.postMessage(
+        JSON.stringify({
+          type: ${WebViewMessageType.ReloadPage},
+        }),
+      );
+    });
+
+    header.insertBefore(refreshButton, plusButton);
+    console.log('inserted refresh button');
+  }
+`;
+
 const cssScript = /* javascript */ `
   var style = document.createElement('style');
   ${setStyleInnerHtml}
   document.head.appendChild(style);
+`;
+
+const html2canvasScript = /* javascript */ `
+ var html2canvasScript = document.createElement("script");
+  html2canvasScript.src = "https://html2canvas.hertzen.com/dist/html2canvas.min.js";
+  document.body.appendChild(html2canvasScript);
+  // html2canvasScript.onload = () => {
+  //   console.log('html2canvas', html2canvas);
+  // };
 `;
 
 const storageChangeHandlerScript = /* javascript */ `
@@ -157,14 +215,20 @@ const hrefChangeHandlerScript = /* javascript */ `
     var currentHref = document.location.href;
     mutations.forEach(() => {
       if (oldHref !== currentHref) {
-        var url = new URL(currentHref);
+        console.log('href changed');
 
         // If chat page
+        var url = new URL(currentHref);
         if (url.pathname !== '/chat') {
           window.ReactNativeWebView.postMessage(
             JSON.stringify({ type: ${WebViewMessageType.DismissKeyboard} }),
           );
         }
+
+        // Delay DOM modifications while DOM is rerendering
+        setTimeout(() => {
+          ${insertRefreshButtonScript}
+        }, 500);
 
         oldHref = currentHref;
       }
@@ -203,14 +267,32 @@ const cloudflareRefreshScript = /* javascript */ `
   }, 3600000); // 1 hours (though it expires after 2 hours from issuing time)
 `;
 
+const drawerOpenHandlerScript = /* javascript */ `
+  // var burgerButton = document.querySelector("${burgerButtonSelector}");
+  // burgerButton.addEventListener("click", () => {
+  //   var isDrawerOpen = !!document.querySelector('${drawerRoot}');
+  //   if (!isDrawerOpen) {
+  //     setTimeout(() => {
+
+  //     }, 500);
+  //   }
+  // })
+`;
+
+// cohtml2canvasScriptnst drawer
+
 const mainScript = /* javascript */ `
   ${cssScript}
+
+  ${html2canvasScript}
 
   ${hrefChangeHandlerScript}
 
   ${scrollScript}
 
   ${cloudflareRefreshScript}
+
+  ${insertRefreshButtonScript}
 
   // Sync theme on init
   window.ReactNativeWebView.postMessage(
@@ -285,7 +367,7 @@ const App: React.FC = () => {
       try {
         var drawerOpenObserver;
         drawerOpenObserver = new MutationObserver(() => {
-          const switchThemeButton = document.querySelector('div[data-headlessui-state="open"] nav > a:nth-of-type(3)');
+          const switchThemeButton = document.querySelector("${drawerContentSelector} > a:nth-of-type(3)");
           // console.log("theme button:", switchThemeButton)
           if (switchThemeButton) {
             switchThemeButton.click();
@@ -315,7 +397,7 @@ const App: React.FC = () => {
     webviewRef.current?.injectJavaScript(/* javascript */ `
       try {
         // console.log('left to right');
-        var isDrawerOpen = !!document.querySelector('div[data-headlessui-state="open"]');
+        var isDrawerOpen = !!document.querySelector('${drawerRoot}');
         // console.log('Drawer is open: ', isDrawerOpen);
 
         if (!isDrawerOpen) {
@@ -333,7 +415,7 @@ const App: React.FC = () => {
     webviewRef.current?.injectJavaScript(/* javascript */ `
       try {
         // console.log('right to left');
-        var isDrawerOpen = !!document.querySelector('div[data-headlessui-state="open"]');
+        var isDrawerOpen = !!document.querySelector('${drawerRoot}');
         // console.log('Drawer is open: ', isDrawerOpen);
 
         if (isDrawerOpen) {
@@ -431,6 +513,11 @@ const App: React.FC = () => {
   const handleMessage = (event: WebViewMessageEvent) => {
     const data: MessageData = JSON.parse(event.nativeEvent.data);
 
+    if (data.type === WebViewMessageType.ReloadPage) {
+      webviewRef.current?.reload();
+      return;
+    }
+
     if (data.type === WebViewMessageType.SyncTheme) {
       handleSyncTheme(data);
       return;
@@ -487,7 +574,7 @@ const App: React.FC = () => {
       />
       <WebView
         ref={webviewRef}
-        source={{ uri: "https://chat.openai.com/chat" }}
+        source={{ uri: "https://chat.openai.com/auth/ext_callback?next=" }}
         originWhitelist={["*"]}
         domStorageEnabled
         cacheEnabled={false}
@@ -500,9 +587,6 @@ const App: React.FC = () => {
         bounces
         pullToRefreshEnabled
         overScrollMode="never"
-        onScroll={() => console.log("SCROLLING")}
-        // allowFileAccess
-        // allowFileAccessFromFileURLs
       />
       <TextInput ref={textInputRef} autoFocus style={{ display: "none" }} />
     </View>
