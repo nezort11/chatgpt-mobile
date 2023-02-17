@@ -46,16 +46,34 @@ const refreshIcon = /* html */ `
   </svg>
 `;
 
-const headerSelector = "#__next > div:nth-of-type(1) > div > div";
-const mainSelector = "#__next > div:nth-of-type(1) > div > main";
-const conversationSelector = `${mainSelector} > div:nth-of-type(1) > div:nth-of-type(1) > div`;
+const unauthenticatedAppSelector =
+  "#__next > div:nth-of-type(1).flex > div:nth-of-type(1)";
+const authenticatedAppSelector =
+  "#__next > div:nth-of-type(1).overflow-hidden > div:nth-of-type(1)";
 
-const burgerButtonSelector = `${headerSelector} > button:nth-of-type(1)`;
-
-const plusButtonSelector = `${headerSelector} > button:last-of-type`;
+const headerSelector = `${authenticatedAppSelector} > div`;
+const mainSelector = `${authenticatedAppSelector} > main`;
+const contentSelector = `${mainSelector} > div:nth-of-type(1)`;
+const footerSelector = `${mainSelector} > div:nth-of-type(2)`;
 
 const drawerRoot = 'div[data-headlessui-state="open"]';
 const drawerContentSelector = `${drawerRoot} nav`;
+
+const messageContainer = `${contentSelector} > div > div > div`;
+const newChatWelcomeSelector = `${messageContainer} > div:nth-of-type(1).px-6`;
+const chatMessageSelector = `${messageContainer} > div.group`;
+const messageButtonsContainerSelector =
+  "div > div:nth-of-type(2) > div:nth-of-type(2)";
+
+const burgerButtonSelector = `${headerSelector} > button:nth-of-type(1)`;
+const plusButtonSelector = `${headerSelector} > button:last-of-type`;
+
+const buttonResetStyles = `
+  box-shadow: none !important;
+  color: currentColor !important;
+  border: none !important;
+  outline: none !important;
+`;
 
 const injectedCss = /* css */ `
   html {
@@ -63,17 +81,10 @@ const injectedCss = /* css */ `
   }
 
   ${headerSelector} button {
-    box-shadow: none !important;
-    color: currentColor !important;
-    border: none !important;
-    outline: none !important;
+    ${buttonResetStyles}
   }
-
   ${drawerContentSelector} button {
-    box-shadow: none !important;
-    color: currentColor !important;
-    border: none !important;
-    outline: none !important;
+    ${buttonResetStyles}
   }
 
   /* Add padding/margin for transparent status bar */
@@ -88,65 +99,67 @@ const injectedCss = /* css */ `
   ${drawerContentSelector} > a:nth-of-type(1) {
     display: none;
   }
-  ${drawerContentSelector} > a:nth-of-type(2) {
-    display: none;
-  }
   ${drawerContentSelector} > a:nth-of-type(3) {
     display: none;
   }
-  ${drawerContentSelector} > a:nth-of-type(4) {
+  ${drawerContentSelector} > a:nth-of-type(5) {
+    display: none;
+  }
+  ${drawerContentSelector} > a:nth-of-type(6) {
     display: none;
   }
   #headlessui-portal-root button[type=button] {
     display: none;
   }
 
-  main > div:last-of-type > form {
-    margin-bottom: 0.5rem;
-  }
-
-  /* Hide examples, capabilities, limitations */
-  main > div:nth-of-type(1) > div > div > div > div:nth-of-type(1) > div.items-start.text-center {
-    display: none;
+  ${messageContainer} {
+    height: 100%;
   }
   /* Align "ChatGPT" vertically */
-  main > div:nth-of-type(1) > div > div > div > div:nth-of-type(1).px-6 {
+  ${newChatWelcomeSelector} {
     margin-top: auto;
     margin-bottom: auto;
   }
+  /* Hide examples, capabilities, limitations */
+  ${newChatWelcomeSelector} > div {
+    display: none;
+  }
 
   /* Fix question content */
-  main > div:nth-of-type(1) > div > div > div:nth-of-type(2n+1) > div > div:nth-of-type(2) > div:nth-of-type(1) {
+  ${messageContainer}:nth-of-type(2n+1) ${messageButtonsContainerSelector} {
     max-width: 100%;
     word-wrap: anywhere;
   }
   /* /chat page */
-  main > div:nth-of-type(1) > div > div > div > div:nth-of-type(2n+1) > div > div:nth-of-type(2) > div:nth-of-type(1) {
+  ${chatMessageSelector}:nth-of-type(2n+1) ${messageButtonsContainerSelector} {
     max-width: 100%;
     word-wrap: anywhere;
   }
 
   /* Fix answer content */
   /* /chat/... page */
-  main > div:nth-of-type(1) > div > div > div:nth-of-type(2n+2) > div > div:nth-of-type(2) > div:nth-of-type(1) {
+  ${messageContainer}:nth-of-type(2n+2) ${messageButtonsContainerSelector} {
     max-width: 100%;
   }
   /* /chat page */
-  main > div:nth-of-type(1) > div > div > div > div:nth-of-type(2n+2) > div > div:nth-of-type(2) > div:nth-of-type(1) {
+  ${chatMessageSelector}:nth-of-type(2n+2) ${messageButtonsContainerSelector} {
     max-width: 100%;
   }
 
   /* Hide answer like / dislike buttons */
-  main > div:nth-of-type(1) > div > div > div:nth-of-type(2n+2) > div > div:nth-of-type(2) > div:nth-of-type(2) {
+  ${messageContainer}:nth-of-type(2n+2) ${messageButtonsContainerSelector} {
     display: none;
   }
-  main > div:nth-of-type(1) > div > div > div > div:nth-of-type(2n+2) > div > div:nth-of-type(2) > div:nth-of-type(2) {
+  ${chatMessageSelector}:nth-of-type(2n+2) ${messageButtonsContainerSelector} {
     display: none;
   }
 
   /* Hide footer caption */
-  main > div:last-of-type > div:last-of-type {
+  ${footerSelector} > div:last-of-type {
     display: none;
+  }
+  ${footerSelector} > form {
+    margin-bottom: 0.5rem;
   }
 `;
 
@@ -154,11 +167,11 @@ const setStyleInnerHtml = /* javascript */ `
   style.innerHTML = \`${injectedCss}\`;
 `;
 
-const insertRefreshButtonScript = /* javascript */ `
-  var oldRefreshButton = document.querySelector("#refresh");
-  console.log('oldRefreshButton', oldRefreshButton);
+const checkInsertRefreshButtonScript = /* javascript */ `
+  var currentRefreshButton = document.querySelector("#refresh");
+  // console.log('oldRefreshButton', oldRefreshButton);
 
-  if (!oldRefreshButton) {
+  if (!currentRefreshButton) {
     var header = document.querySelector("${headerSelector}");
     var plusButton = document.querySelector("${plusButtonSelector}");
     var refreshButton = document.createElement("button");
@@ -174,7 +187,7 @@ const insertRefreshButtonScript = /* javascript */ `
     });
 
     header.insertBefore(refreshButton, plusButton);
-    console.log('inserted refresh button');
+    // console.log('inserted refresh button');
   }
 `;
 
@@ -209,33 +222,31 @@ const storageChangeHandlerScript = /* javascript */ `
 `;
 
 const hrefChangeHandlerScript = /* javascript */ `
-  var oldHref = document.location.href;
-  var body = document.querySelector("body");
-  var observer = new MutationObserver((mutations) => {
+  var previousHref = document.location.href;
+
+  var bodyObserver = new MutationObserver((mutations) => {
+    // console.log("body mutations", mutations);
+    // console.log("body dom changed");
+
     var currentHref = document.location.href;
-    mutations.forEach(() => {
-      if (oldHref !== currentHref) {
-        console.log('href changed');
+    // mutations.forEach(() => {
+      if (previousHref !== currentHref) {
+        var url = new URL(currentHref);
+        // console.log('href changed');
 
         // If chat page
-        var url = new URL(currentHref);
         if (url.pathname !== '/chat') {
           window.ReactNativeWebView.postMessage(
             JSON.stringify({ type: ${WebViewMessageType.DismissKeyboard} }),
           );
         }
 
-        // Delay DOM modifications while DOM is rerendering
-        setTimeout(() => {
-          ${insertRefreshButtonScript}
-        }, 500);
-
         oldHref = currentHref;
       }
-    });
+    // });
   });
-  // Listen to DOM changes
-  observer.observe(body, { childList: true, subtree: true });
+  var body = document.querySelector("body");
+  bodyObserver.observe(body, { childList: true, subtree: true });
 `;
 
 const scrollScript = /* javascript */ `
@@ -281,6 +292,8 @@ const drawerOpenHandlerScript = /* javascript */ `
 
 // cohtml2canvasScriptnst drawer
 
+const MAIN_LOOP_INTERVAL = 100;
+
 const mainScript = /* javascript */ `
   ${cssScript}
 
@@ -292,7 +305,10 @@ const mainScript = /* javascript */ `
 
   ${cloudflareRefreshScript}
 
-  ${insertRefreshButtonScript}
+  // Main loop
+  setInterval(() => {
+    ${checkInsertRefreshButtonScript}
+  }, ${MAIN_LOOP_INTERVAL});
 
   // Sync theme on init
   window.ReactNativeWebView.postMessage(

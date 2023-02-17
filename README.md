@@ -11,10 +11,11 @@ Download Android APK file on
 - native drawer swipe
 - transparent status bar
 - themed bottom bar
+- automatic light/dark theme (based on system)
 - android back button (close drawer / quit app)
-- startup keyboard auto open
-- chat keyboard auto dismiss
-- splash screen
+- startup keyboard automatic open
+- chat keyboard automatic dismiss
+- splash screen display
 - page reload button
 - "chatgpt is at capacity" workaround
 

@@ -1,6 +1,7 @@
 {
   "name": "chatgpt-mobile",
-  "version": "1.0.1",
+  "version": "1.0.3",
+  "license": "MIT",
   "main": "node_modules/expo/AppEntry.js",
   "repository": {
     "type": "git",
@@ -12,8 +13,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "build": "eas build --platform=android --profile=production --non-interactive | tee $(mkdir -p ./dist && echo ./dist/build-output.txt)",
-    "download": "if [ -f ./dist/build-output.txt ]; then curl -LJ -o ./dist/chatgpt.apk $(echo $(grep 'https://expo.dev/artifacts/eas/[a-zA-Z0-9]*\\.[a-zA-Z]*' ./dist/build-output.txt)) ; else echo 'Please run `yarn build` first' ; fi",
-    "publish": "if [ -f ./dist/chatgpt.apk ]; then   gh-release create --assets ./dist/chatgpt.apk   ; else echo 'Please run `yarn download` first' ; fi"
+    "download": "if [ -f ./dist/build-output.txt ]; then curl -LJ -o ./dist/chatgpt-$(grep -o '\"version\": \"[^\"]*\"' app.json | cut -d'\"' -f4)-$(date +%Y-%m-%d).apk $(echo $(grep 'https://expo.dev/artifacts/eas/[a-zA-Z0-9]*\\.[a-zA-Z]*' ./dist/build-output.txt)) ; else echo 'Please run `yarn build` first' ; fi",
+    "publish:github": "if [ -f ./dist/chatgpt-$(grep -o '\"version\": \"[^\"]*\"' app.json | cut -d'\"' -f4)-$(date +%Y-%m-%d).apk ]; then   gh-release create --assets ./dist/chatgpt-$(grep -o '\"version\": \"[^\"]*\"' app.json | cut -d'\"' -f4)-$(date +%Y-%m-%d).apk   ; else echo 'Please run `yarn download` first' ; fi"
   },
   "dependencies": {
     "@types/lodash": "^4.14.191",
@@ -36,6 +37,5 @@
     "@types/react-native": "~0.70.6",
     "gh-release": "^7.0.2",
     "typescript": "^4.6.3"
-  },
-  "private": true
+  }
 }
